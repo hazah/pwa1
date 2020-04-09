@@ -1,0 +1,39 @@
+version: '3'
+services:
+  pwa:
+    build: .
+    container_name: pwa
+    command: bash
+    tty: true
+    stdin_open: true
+    user: app
+    volumes:
+      - ~/.ssh:/home/app/.ssh
+      - .:/usr/src/app
+      - pwabundle:/bundle
+    tmpfs:
+      - /usr/src/app/tmp/pids:mode=777,size=4m,uid=1000,gid=1000
+    ports:
+      - "3000:3000"
+      - "3035:3035"
+      - "35729:35729"
+    depends_on:
+      - pwadb
+    environment: 
+      TZ: America/New_York
+      PGHOST: pwadb
+      PGUSER: postgres
+  pwadb:
+    image: postgres
+    container_name: pwadb
+    volumes:
+      - pwadata:/var/lib/postgresql/data
+    environment:
+      TZ: America/New_York
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD:
+volumes:
+  pwabundle:
+    external: true
+  pwadata:
+    external: true

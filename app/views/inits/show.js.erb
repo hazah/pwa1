@@ -1,0 +1,8 @@
+if ('serviceWorker' in navigator) {
+  console.info("[Registering Service Worker]");
+  navigator.serviceWorker.register("<%= service_worker_path(format: :js) %>", { scope: "<%= root_path %>" }).then((registration) => {
+    console.info("[Service Worker Registered]", registration);
+  }).catch((error) => {
+    console.info('Registration failed with ' + error);
+  });
+}
