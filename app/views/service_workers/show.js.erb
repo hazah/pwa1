@@ -1,14 +1,25 @@
-var CACHE_VERSION = 1;
-var CACHE_NAME = "v" + CACHE_VERSION + ":sw-cache-";
+const CACHE_VERSION = 1;
+const CACHE_NAME = "v" + CACHE_VERSION + ":sw-cache-";
+const DEFAULTS = {
+  layout: {
+    name: "welcome",
+    definition: {
+      "main-application": [
+        "welcome-message",
+        "enable-push-notifications"
+      ]
+    }
+  }
+};
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
   console.info("[Service Worker Installing]", self);
   event.waitUntil(
     caches.open(CACHE_NAME).then(function prefill(cache) {
       return cache.addAll([
         "<%= asset_pack_path "application.js" %>",
         "<%= path_to_stylesheet "application", debug: true %>",
-        "<%= root_path %>",
+        "<%= application_path %>",
         "<%= manifest_path(format: :json) %>",
         "<%= init_path(format: :js) %>",
         "<%= asset_path("icon_192.png") %>",
@@ -19,7 +30,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   console.info("[Service Worker Activating]", self);
   createDatabase();
   event.waitUntil(
@@ -37,26 +48,9 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.headers.get("Accept") === "application/json, text/javascript, */*; q=0.01"
-    && event.request.url !== "<%= manifest_url(format: :json) %>") {
-    event.respondWith(
-      getLayout("welcome").then((layout) => {
-        console.info("[Using Layout]", layout);
-        return new Response(JSON.stringify(layout.value), {
-          headers: {'Content-Type': 'application/json'}
-        });
-      }).catch((error) => {
-        console.error(error);
-        let layout = {
-          'main-application': 'welcome-message'
-        };
-
-        return new Response(JSON.stringify(layout), {
-          headers: {'Content-Type': 'application/json'}
-        });
-      })
-    );
+self.addEventListener("fetch", (event) => {
+  if (isLocalRequest(event.request)) {
+    event.respondWith(localResponse());
   } else {
     event.respondWith(
       caches.match(event.request).then(function(response) {
@@ -74,8 +68,42 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
+function notManifestRequest(url) {
+  return url !== "<%= manifest_url(format: :json) %>";
+}
+
+function railsUJSJSONRequest(accept) {
+  return accept === "application/json, text/javascript, */*; q=0.01";
+}
+
+function isLocalRequest(request) {
+  return railsUJSJSONRequest(request.headers.get("Accept")) 
+    && notManifestRequest(request.url);
+}
+
+function localResponse() {
+  return layoutResponse();
+}
+
+function layoutResponse() {
+  return getState("layout").then((name) => {
+    return getLayout(name.value).then((layout) => {
+      console.info("[Using Layout]", layout);
+      return new Response(JSON.stringify(layout.value), {
+        headers: {"Content-Type": "application/json"}
+      });
+    }).catch((error) => {
+      console.error(error);
+
+      return new Response(JSON.stringify(DEFAULTS["layout"]["definition"]), {
+        headers: {"Content-Type": "application/json"}
+      });
+    });
+  });
+}
+
 function createDatabase() {
-  if ('indexedDB' in self) {
+  if ("indexedDB" in self) {
     let handle = self.indexedDB.open("database", CACHE_VERSION);
 
     handle.addEventListener("success", (event) => {
@@ -90,13 +118,20 @@ function createDatabase() {
     handle.addEventListener("upgradeneeded", (event) => {
       console.info("[Upgrading Database]", event);
       let db = event.target.result;
-      let layouts;
+      
       try {
-        layouts = db.createObjectStore("layouts", { keyPath: "name" });
+        let states = db.createObjectStore("states", { keyPath: "key" });
+        states.createIndex("key", "key", { unique: true });
+        states.transaction.addEventListener("complete", (event) => {
+          let states = db.transaction("states", "readwrite").objectStore("states");
+          states.add({ key: "layout", value: DEFAULTS["layout"]["name"] });
+        });
+        
+        let layouts = db.createObjectStore("layouts", { keyPath: "name" });
         layouts.createIndex("name", "name", { unique: true });
         layouts.transaction.addEventListener("complete", (event) => {
           let layouts = db.transaction("layouts", "readwrite").objectStore("layouts");
-          layouts.add({ name: "welcome", value: { 'main-application': 'welcome-message' } });
+          layouts.add({ name: DEFAULTS["layout"]["name"], value: DEFAULTS["layout"]["definition"] });
         });
       } catch (error) {
         console.error(error);
@@ -109,9 +144,9 @@ function createDatabase() {
   }
 }
 
-function getLayout(name) {
+function getObject(store, key) {
   return new Promise((success, error) => {
-    if ('indexedDB' in self) {
+    if ("indexedDB" in self) {
       let handle = self.indexedDB.open("database", CACHE_VERSION);
       
       handle.addEventListener("success", (event) => {
@@ -119,14 +154,14 @@ function getLayout(name) {
         let db = event.target.result;
 
         try {
-          let layouts = db.transaction("layouts").objectStore("layouts");
-          let layout = layouts.get("welcome");
-          layout.addEventListener("success", (event) => {
-            console.info("[Retrieved Layout]", event);
+          let collection = db.transaction(store).objectStore(store);
+          let object = collection.get(key);
+          object.addEventListener("success", (event) => {
+            console.info("[Retrieved Object]", event);
             success(event.target.result);
           });
 
-          layout.addEventListener("error", (error) => {
+          object.addEventListener("error", (error) => {
             error(error);
           });
         } catch (error) {
@@ -139,4 +174,12 @@ function getLayout(name) {
       });
     }
   });
+}
+
+function getLayout(name) {
+  return getObject("layouts", name);
+}
+
+function getState(key) {
+  return getObject("states", key);
 }

@@ -1,11 +1,11 @@
 Rails.application.routes.draw do
-  # PWA
+  # Backend
   resource :init
   resource :manifest
   resource :offline
   resource :service_worker
+  resources :workers
   
   # Frontend
-  root to: "application#show"
-  resources :workers
+  resource :application, controller: :application, path: ''
 end

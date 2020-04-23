@@ -7,8 +7,8 @@ json.icons do
   ]
   json.array! icons, :src, :type, :sizes
 end 
-json.start_url root_path
+json.start_url application_path
 json.background_color "#fff"
 json.display "standalone"
-json.scope root_path
+json.scope application_path
 json.theme_color "#000"

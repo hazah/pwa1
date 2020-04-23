@@ -1,9 +1,18 @@
-<component-template name="main-application">
-  <div id="main-application">
-    <slot></slot>    
-  </div>
-</component-template>
+<template id="main-application" data-component>
+  <slot></slot>    
+</template>
 
-<component-template name="welcome-message">
+<template id="welcome-message" data-component>
   <h1>Welcome!</h1>
-</component-template>
+</template>
+
+<template id="enable-push-notifications" data-component>
+  <push-notifications action="request">
+    <%= button_tag 'Enable Push Notifications' %>
+  </push-notifications>
+</template>
+
+<main-application>
+  <welcome-message></welcome-message>
+  <enable-push-notifications></enable-push-notifications>
+</main-application>

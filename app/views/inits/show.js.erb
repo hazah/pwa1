@@ -1,7 +1,10 @@
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && 'SyncManager' in window) {
   console.info("[Registering Service Worker]");
-  navigator.serviceWorker.register("<%= service_worker_path(format: :js) %>", { scope: "<%= root_path %>" }).then((registration) => {
+  navigator.serviceWorker.register("<%= service_worker_path(format: :js) %>", { scope: "<%= application_path %>" }).then((registration) => {
     console.info("[Service Worker Registered]", registration);
+    return registration.ready;
+  }).then((registration) => {
+    console.info("[Service Worker Ready]", registration);
   }).catch((error) => {
     console.info('Registration failed with ' + error);
   });
